@@ -145,6 +145,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   "use strict";
   var API = "https://api.themoviedb.org/3";
   var IMG = "https://image.tmdb.org/t/p/";
+  var PROXY = "https://wsrv.nl/?url="; /* image.tmdb.org erisilemezse yedek yol */
   var PROV = { 8: "N", 119: "P", 1904: "T" };
   var PNAME = { N: "Netflix", P: "Prime Video", T: "TV+", B: "beIN CONNECT" };
   var PAGES = 3, TTL = 12 * 3600 * 1000;
@@ -243,7 +244,11 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     p.style.setProperty("--h", hue(it.title));
     if (it.poster) {
       var img = el("img"); img.src = IMG + "w342" + it.poster; img.alt = ""; img.loading = "lazy";
-      img.addEventListener("error", function () { img.remove(); p.appendChild(el("span", "ph", it.title)); });
+      var tried = false;
+      img.addEventListener("error", function () {
+        if (!tried) { tried = true; img.src = PROXY + encodeURIComponent("image.tmdb.org/t/p/w342" + it.poster); return; }
+        img.remove(); p.appendChild(el("span", "ph", it.title));
+      });
       p.appendChild(img);
     } else p.appendChild(el("span", "ph", it.title));
     var b = el("div", "badges");
@@ -341,6 +346,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     var it = hero;
     h.hidden = false; h.textContent = "";
     h.style.backgroundImage = "url(" + IMG + "w780" + it.backdrop + ")";
+    var bt = new Image(); bt.onerror = function () { h.style.backgroundImage = "url(" + PROXY + encodeURIComponent("image.tmdb.org/t/p/w780" + it.backdrop) + ")"; }; bt.src = IMG + "w780" + it.backdrop;
     h.appendChild(el("div", "eyebrow", "Bu akşam için"));
     h.appendChild(el("h2", "", it.title));
     var m = [it.type === "tv" ? "Dizi" : "Film"].concat(genresOf(it).slice(0, 2));
