@@ -96,6 +96,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
 .panel .two .poster { flex: 0 0 120px; }
 .panel .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .panel label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin: 10px 0; }
+.panel textarea { font: inherit; font-size: 12px; width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 6px 0; }
 .panel input, .panel select { font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; min-width: 0; }
 .panel p { font-size: 13px; color: var(--muted); }
 .close { float: right; background: none; border: 0; font-size: 24px; cursor: pointer; line-height: 1; color: var(--muted); }
@@ -690,6 +691,32 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
       var x = el("button", "btn alt", "Anahtarı sil"); x.type = "button";
       x.addEventListener("click", function () { try { localStorage.removeItem(K_KEY); localStorage.removeItem(K_CAT); } catch (e) {} key = ""; closePanel(); showSetup(); });
       acts.appendChild(s); acts.appendChild(r); acts.appendChild(x); p.appendChild(acts);
+      p.appendChild(el("h3", "", "Yedek"));
+      p.appendChild(el("p", "", "Listen, zevkin ve izlediklerin yalnızca bu telefonun tarayıcısında saklanır. Tarayıcı verisi silinirse kaybolur. Yedeği kopyalayıp bir yere (Notlar, WhatsApp'ta kendine mesaj) yapıştırabilir, gerektiğinde buradan geri yükleyebilirsin."));
+      var ta = el("textarea"); ta.rows = 4; ta.placeholder = "Yedek metni burada görünür. Geri yüklemek için buraya yapıştır.";
+      p.appendChild(ta);
+      var bmsg = el("p", "", "");
+      var bacts = el("div", "acts");
+      var bk = el("button", "btn alt", "Yedeği kopyala"); bk.type = "button";
+      bk.addEventListener("click", function () {
+        ta.value = JSON.stringify({ app: "ne-izlesem", v: 1, favs: favs, seen: seen, taste: taste, user: userItems });
+        ta.select();
+        var ok = function () { bmsg.textContent = "Yedek kopyalandı (" + Object.keys(taste).length + " değerlendirme, " + seen.length + " izlenen). Bir yere yapıştırıp sakla."; };
+        var no = function () { bmsg.textContent = "Otomatik kopyalanamadı. Kutudaki metni uzun basıp kopyala."; };
+        try { navigator.clipboard.writeText(ta.value).then(ok, no); } catch (e) { no(); }
+      });
+      var bl = el("button", "btn alt", "Yedeği geri yükle"); bl.type = "button";
+      bl.addEventListener("click", function () {
+        var d; try { d = JSON.parse(ta.value); } catch (e) { d = null; }
+        if (!d || d.app !== "ne-izlesem") { bmsg.textContent = "Yedek metni okunamadı. Kopyaladığın metnin tamamını yapıştır."; return; }
+        (d.favs || []).forEach(function (k) { if (favs.indexOf(k) < 0) favs.push(k); });
+        (d.seen || []).forEach(function (k) { if (seen.indexOf(k) < 0) seen.push(k); });
+        Object.keys(d.taste || {}).forEach(function (k) { taste[k] = d.taste[k]; });
+        (d.user || []).forEach(function (u) { if (!userItems.some(function (x) { return x.k === u.k; })) userItems.push(u); });
+        wr(K_FAV, favs); wr(K_SEEN, seen); wr(K_TASTE, taste); wr(K_USER, userItems);
+        closePanel(); render(); renderHero(true); scheduleFY();
+      });
+      bacts.appendChild(bk); bacts.appendChild(bl); p.appendChild(bacts); p.appendChild(bmsg);
       var a = el("p", "", "");
       a.appendChild(document.createTextNode("Veriler "));
       var l1 = el("a", "", "TMDB"); l1.href = "https://www.themoviedb.org"; l1.target = "_blank"; l1.rel = "noopener";
@@ -745,6 +772,11 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   document.getElementById("tasteBtn").addEventListener("click", openTaste);
   document.getElementById("addBtn").addEventListener("click", function () { if (key) openAdd(); else showSetup(); });
   document.getElementById("setBtn").addEventListener("click", openSettings);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !key || !items.length) return;
+    taste = rd(K_TASTE, {}); favs = rd(K_FAV, []); seen = rd(K_SEEN, []); userItems = rd(K_USER, []);
+    render();
+  });
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   boot(false);
 })();
