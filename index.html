@@ -745,6 +745,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   document.getElementById("tasteBtn").addEventListener("click", openTaste);
   document.getElementById("addBtn").addEventListener("click", function () { if (key) openAdd(); else showSetup(); });
   document.getElementById("setBtn").addEventListener("click", openSettings);
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   boot(false);
 })();
 </script>
