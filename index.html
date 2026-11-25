@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e1013">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Ne İzlesem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Düzen: üstte öne çıkan içerik, altında filtreler, sonra Netflix tarzı yatay afiş satırları. Tek tema, sinema salonu karanlığı. */
+:root {
+  --bg: #0e1013;
+  --panel: #171a1f;
+  --line: #2a2f37;
+  --ink: #f1ede4;
+  --muted: #9aa0a9;
+  --accent: #f2b84b;
+  --p-N: #e5383b;
+  --p-P: #29a3e0;
+  --p-T: #9b6ae0;
+  --p-B: #1fb58f;
+  --font-display: "Oswald", "Arial Narrow", Impact, sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); }
+body { padding: 14px 0 56px; max-width: 1100px; margin: 0 auto; line-height: 1.45; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; margin-bottom: 10px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: .03em; margin: 0; text-transform: uppercase; }
+.iconbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 50%; width: 38px; height: 38px; cursor: pointer; font-size: 18px; line-height: 1; }
+
+.hero { margin: 0 16px 14px; border-radius: 12px; min-height: 230px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 16px; position: relative; overflow: hidden; background: linear-gradient(160deg, #263041, #0e1013); border: 1px solid rgba(255,255,255,.08); background-size: cover; background-position: center 20%; }
+.hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(14,16,19,.96) 8%, rgba(14,16,19,.55) 55%, rgba(14,16,19,.2)); }
+.hero > * { position: relative; }
+.hero .eyebrow { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.8); }
+.hero h2 { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: clamp(26px, 8vw, 42px); line-height: 1.02; margin: 0; text-wrap: balance; }
+.hero .meta { font-size: 13px; color: rgba(255,255,255,.85); }
+.hero .ov { font-size: 13px; color: rgba(255,255,255,.82); max-width: 62ch; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.btn { font-weight: 700; font-size: 14px; border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer; background: var(--ink); color: #111; }
+.btn.alt { background: rgba(255,255,255,.16); color: var(--ink); }
+.btn.gold { background: var(--accent); color: #1a1405; }
+.btn[disabled] { opacity: .55; cursor: default; }
+
+.bar { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.chip { flex: 0 0 auto; font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; white-space: nowrap; }
+.chip[aria-pressed="true"] { background: var(--ink); color: #111; border-color: var(--ink); font-weight: 700; }
+.status { margin: 8px 16px 0; font-size: 13px; color: var(--muted); }
+.status.err { color: #ff8d8f; }
+
+.row { margin-top: 20px; }
+.rowhead { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; margin-bottom: 8px; }
+.rowhead h2 { font-family: var(--font-display); font-weight: 500; font-size: 19px; letter-spacing: .03em; margin: 0; }
+.arrows { display: flex; gap: 6px; }
+.arrow { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); cursor: pointer; line-height: 1; }
+.scroller { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 16px 8px; scroll-padding-left: 16px; }
+.card { flex: 0 0 120px; min-width: 0; scroll-snap-align: start; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.poster { position: relative; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; background: linear-gradient(165deg, hsl(var(--h, 215) 45% 28%), hsl(var(--h, 215) 55% 10%)); box-shadow: 0 5px 14px rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.08); display: flex; align-items: flex-end; padding: 8px; }
+.poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.poster .ph { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: 15px; line-height: 1.05; position: relative; overflow-wrap: anywhere; }
+.badges { position: absolute; top: 6px; left: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+.badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.b-N { background: var(--p-N); }
+.b-P { background: var(--p-P); color: #04202e; }
+.b-T { background: var(--p-T); }
+.b-B { background: var(--p-B); color: #03231b; }
+.poster.seen img { opacity: .35; }
+.seenmark { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.65); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+.logos { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.logo { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px 4px 4px; }
+.logo img { width: 28px; height: 28px; border-radius: 6px; }
+.logo span, .logos > span { font-size: 12px; color: var(--muted); }
+.heart { position: absolute; right: 6px; bottom: 6px; color: var(--accent); text-shadow: 0 1px 4px #000; }
+.cap { font-size: 12px; margin-top: 5px; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cap small { color: var(--muted); display: block; }
+
+.sheet { position: fixed; inset: 0; background: rgba(0,0,0,.74); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+.sheet.on { display: flex; }
+.panel { background: var(--panel); width: 100%; max-width: 640px; max-height: 90%; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 16px; border: 1px solid var(--line); }
+.panel h2 { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: 24px; line-height: 1.05; margin: 0 0 6px; text-wrap: balance; }
+.panel h3 { font-family: var(--font-display); font-weight: 500; font-size: 16px; letter-spacing: .04em; margin: 14px 0 6px; }
+.panel .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+.panel .ov { font-size: 14px; margin: 10px 0; }
+.panel .two { display: flex; gap: 14px; }
+.panel .two .poster { flex: 0 0 120px; }
+.panel .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.panel label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin: 10px 0; }
+.panel input, .panel select { font: inherit; font-size: 14px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; min-width: 0; }
+.panel p { font-size: 13px; color: var(--muted); }
+.close { float: right; background: none; border: 0; font-size: 24px; cursor: pointer; line-height: 1; color: var(--muted); }
+.results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.res { display: flex; gap: 10px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; cursor: pointer; text-align: left; }
+.res .poster { flex: 0 0 44px; aspect-ratio: 2/3; border-radius: 4px; padding: 0; }
+.res small { color: var(--muted); display: block; }
+.setup { margin: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.setup h2 { font-family: var(--font-display); margin: 0 0 8px; font-size: 20px; }
+.setup input { width: 100%; font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0; }
+.empty { color: var(--muted); padding: 24px 16px; }
+.foot { margin: 26px 16px 0; font-size: 12px; color: var(--muted); }
+.foot p { margin: 4px 0; }
+@media (min-width: 700px) { .card { flex-basis: 150px; } }
+@media (prefers-reduced-motion: no-preference) { .card .poster { transition: transform .15s; } .card:hover .poster { transform: translateY(-3px); } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Ne İzlesem</h1>
+  <div style="display:flex;gap:8px">
+    <button class="iconbtn" id="addBtn" type="button" aria-label="İçerik ekle" title="İçerik ekle">+</button>
+    <button class="iconbtn" id="setBtn" type="button" aria-label="Ayarlar" title="Ayarlar">⚙</button>
+  </div>
+</div>
+
+<div class="status" id="status" role="status"></div>
+<div id="setupHost"></div>
+<div class="hero" id="hero" hidden></div>
+<div class="bar" id="bar" hidden>
+  <div class="chips" id="platforms" role="group" aria-label="Platform filtresi"></div>
+  <div class="chips" id="genres" role="group" aria-label="Tür filtresi"></div>
+  <div class="chips" id="opts"></div>
+</div>
+<div id="rows"></div>
+<div class="empty" id="empty" hidden>Bu filtrede içerik yok.</div>
+
+<div class="foot">
+  <p>Veriler TMDB'den alınır. Bu uygulama TMDB API'sini kullanır, ancak TMDB tarafından onaylanmamış veya sertifikalandırılmamıştır. Platform bilgisi JustWatch kaynaklıdır, eksik veya gecikmeli olabilir.</p>
+  <p>Kişisel kullanım içindir. Listen ve ayarların yalnızca bu cihazda saklanır.</p>
+</div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Ayrıntı"><div class="panel" id="panel"></div></div>
+
+<script>
+(function () {
+  "use strict";
+  var API = "https://api.themoviedb.org/3";
+  var IMG = "https://image.tmdb.org/t/p/";
+  var PROV = { 8: "N", 119: "P", 1904: "T" };
+  var PNAME = { N: "Netflix", P: "Prime Video", T: "TV+", B: "beIN CONNECT" };
+  var PAGES = 3, TTL = 12 * 3600 * 1000;
+  var K_KEY = "nz.key", K_CAT = "nz.catalog", K_USER = "nz.user", K_FAV = "nz.fav", K_SEEN = "nz.seen", K_HIDE = "nz.hide";
+
+  function rd(k, d) { try { var r = localStorage.getItem(k); return r ? JSON.parse(r) : d; } catch (e) { return d; } }
+  function wr(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function el(t, c, x) { var n = document.createElement(t); if (c) n.className = c; if (x !== undefined && x !== null) n.textContent = x; return n; }
+
+  var key = (function () { try { return localStorage.getItem(K_KEY) || ""; } catch (e) { return ""; } })();
+  var genreNames = {};
+  var items = [], userItems = rd(K_USER, []), favs = rd(K_FAV, []), seen = rd(K_SEEN, []), hideSeen = rd(K_HIDE, true);
+  function notSeen(it) { return seen.indexOf(it.k) < 0; }
+  var fPlat = "Hepsi", fGenre = "Hepsi", hero = null;
+  var statusEl = document.getElementById("status");
+
+  function setStatus(msg, err) { statusEl.textContent = msg || ""; statusEl.className = "status" + (err ? " err" : ""); }
+
+  async function tmdb(path, params) {
+    var u = new URL(API + path);
+    u.searchParams.set("api_key", key);
+    Object.keys(params || {}).forEach(function (k) { u.searchParams.set(k, params[k]); });
+    var r = await fetch(u.toString());
+    if (!r.ok) { var e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+    return r.json();
+  }
+
+  /* ---------- katalog ---------- */
+  function fromRaw(type, r) {
+    return {
+      k: type + r.id, type: type, id: r.id,
+      title: type === "tv" ? r.name : r.title,
+      year: parseInt(((type === "tv" ? r.first_air_date : r.release_date) || "").slice(0, 4), 10) || null,
+      vote: r.vote_average || 0, gids: r.genre_ids || [],
+      poster: r.poster_path || "", backdrop: r.backdrop_path || "", ov: r.overview || "", plats: []
+    };
+  }
+
+  async function loadCatalog(force) {
+    var cache = rd(K_CAT, null);
+    if (!force && cache && Date.now() - cache.ts < TTL && cache.items && cache.items.length) {
+      genreNames = cache.genres || {}; return cache.items;
+    }
+    setStatus("Katalog yükleniyor...");
+    var jobs = [];
+    ["tv", "movie"].forEach(function (type) {
+      Object.keys(PROV).forEach(function (pid) {
+        for (var p = 1; p <= PAGES; p++) {
+          jobs.push(tmdb("/discover/" + type, { watch_region: "TR", with_watch_providers: pid, with_watch_monetization_types: "flatrate", sort_by: "popularity.desc", language: "tr-TR", page: p })
+            .then(function (type, pid) { return function (d) { return { type: type, pid: pid, results: d.results || [] }; }; }(type, pid))
+            .catch(function () { return { type: type, pid: pid, results: [] }; }));
+        }
+      });
+    });
+    var g = await Promise.all([tmdb("/genre/movie/list", { language: "tr" }), tmdb("/genre/tv/list", { language: "tr" })]);
+    var names = {};
+    g.forEach(function (x) { (x.genres || []).forEach(function (o) { names[o.id] = o.name; }); });
+    genreNames = names;
+    var res = await Promise.all(jobs);
+    var map = {};
+    res.forEach(function (b) {
+      b.results.forEach(function (r) {
+        var it = fromRaw(b.type, r);
+        if (!map[it.k]) map[it.k] = it;
+        var c = PROV[b.pid];
+        if (map[it.k].plats.indexOf(c) < 0) map[it.k].plats.push(c);
+      });
+    });
+    var list = Object.keys(map).map(function (k) { return map[k]; });
+    wr(K_CAT, { ts: Date.now(), items: list, genres: names });
+    return list;
+  }
+
+  function merged() {
+    var map = {};
+    items.forEach(function (it) { map[it.k] = JSON.parse(JSON.stringify(it)); });
+    userItems.forEach(function (u) {
+      if (map[u.k]) { u.plats.forEach(function (c) { if (map[u.k].plats.indexOf(c) < 0) map[u.k].plats.push(c); }); }
+      else map[u.k] = JSON.parse(JSON.stringify(u));
+    });
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+
+  function genresOf(it) {
+    if (it.glabels) return it.glabels;
+    var out = [];
+    (it.gids || []).forEach(function (id) { var n = genreNames[id]; if (n && out.indexOf(n) < 0) out.push(n); });
+    return out;
+  }
+
+  /* ---------- görünüm ---------- */
+  function hue(t) { var s = 0; for (var i = 0; i < t.length; i++) s = (s * 31 + t.charCodeAt(i)) % 360; return s; }
+
+  function poster(it) {
+    var p = el("div", "poster");
+    p.style.setProperty("--h", hue(it.title));
+    if (it.poster) {
+      var img = el("img"); img.src = IMG + "w342" + it.poster; img.alt = ""; img.loading = "lazy";
+      img.addEventListener("error", function () { img.remove(); p.appendChild(el("span", "ph", it.title)); });
+      p.appendChild(img);
+    } else p.appendChild(el("span", "ph", it.title));
+    var b = el("div", "badges");
+    it.plats.forEach(function (c) { b.appendChild(el("span", "badge b-" + c, c === "N" ? "N" : c === "P" ? "Prime" : c === "T" ? "TV+" : "beIN")); });
+    p.appendChild(b);
+    if (favs.indexOf(it.k) >= 0) p.appendChild(el("span", "heart", "♥"));
+    if (seen.indexOf(it.k) >= 0) { p.classList.add("seen"); p.appendChild(el("span", "seenmark", "✓ izlendi")); }
+    return p;
+  }
+
+  function filtered(list) {
+    return list.filter(function (it) {
+      return (fPlat === "Hepsi" || it.plats.indexOf(fPlat) >= 0) && (fGenre === "Hepsi" || genresOf(it).indexOf(fGenre) >= 0);
+    });
+  }
+
+  function chipRow(host, pairs, cur, on) {
+    host.textContent = "";
+    [["Hepsi", "Hepsi"]].concat(pairs).forEach(function (pr) {
+      var b = el("button", "chip", pr[1]); b.type = "button";
+      b.setAttribute("aria-pressed", String(pr[0] === cur));
+      b.addEventListener("click", function () { on(pr[0]); });
+      host.appendChild(b);
+    });
+  }
+
+  function row(title, list) {
+    if (!list.length) return null;
+    var r = el("section", "row");
+    var head = el("div", "rowhead");
+    head.appendChild(el("h2", "", title));
+    var sc = el("div", "scroller");
+    var ar = el("div", "arrows");
+    var pv = el("button", "arrow", "‹"); pv.type = "button"; pv.setAttribute("aria-label", title + " sola");
+    var nx = el("button", "arrow", "›"); nx.type = "button"; nx.setAttribute("aria-label", title + " sağa");
+    pv.addEventListener("click", function () { sc.scrollBy({ left: -sc.clientWidth * 0.8, behavior: "smooth" }); });
+    nx.addEventListener("click", function () { sc.scrollBy({ left: sc.clientWidth * 0.8, behavior: "smooth" }); });
+    ar.appendChild(pv); ar.appendChild(nx); head.appendChild(ar);
+    list.forEach(function (it) {
+      var c = el("button", "card"); c.type = "button";
+      c.setAttribute("aria-label", it.title);
+      c.appendChild(poster(it));
+      var cap = el("div", "cap", it.title);
+      if (it.year) cap.appendChild(el("small", "", it.year + (it.vote ? " · ★ " + it.vote.toFixed(1) : "")));
+      c.appendChild(cap);
+      c.addEventListener("click", function () { openDetail(it); });
+      sc.appendChild(c);
+    });
+    r.appendChild(head); r.appendChild(sc);
+    return r;
+  }
+
+  function byVote(a, b) { return (b.vote || 0) - (a.vote || 0); }
+
+  function render() {
+    var all = merged();
+    var counts = {};
+    all.forEach(function (it) { genresOf(it).forEach(function (g) { counts[g] = (counts[g] || 0) + 1; }); });
+    var gs = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 14);
+    chipRow(document.getElementById("platforms"), ["N", "P", "T", "B"].map(function (c) { return [c, PNAME[c]]; }), fPlat, function (v) { fPlat = v; render(); });
+    chipRow(document.getElementById("genres"), gs.map(function (g) { return [g, g]; }), fGenre, function (v) { fGenre = v; render(); });
+    var opts = document.getElementById("opts");
+    opts.textContent = "";
+    var ob = el("button", "chip", "İzlediklerimi gizle"); ob.type = "button";
+    ob.setAttribute("aria-pressed", String(hideSeen));
+    ob.addEventListener("click", function () { hideSeen = !hideSeen; wr(K_HIDE, hideSeen); render(); renderHero(false); });
+    opts.appendChild(ob);
+    var rawList = filtered(all);
+    var list = hideSeen ? rawList.filter(notSeen) : rawList;
+    var host = document.getElementById("rows");
+    host.textContent = "";
+    var thisYear = new Date().getFullYear();
+    var rows = [
+      row("Benim listem", rawList.filter(function (it) { return favs.indexOf(it.k) >= 0 && notSeen(it); })),
+      row("Yüksek puanlılar", list.filter(function (it) { return it.vote >= 7.8; }).sort(byVote).slice(0, 30)),
+      row("Yeni çıkanlar", list.filter(function (it) { return it.year >= thisYear - 1; }).sort(function (a, b) { return b.year - a.year || byVote(a, b); }).slice(0, 30)),
+      row("Diziler", list.filter(function (it) { return it.type === "tv"; }).sort(byVote)),
+      row("Filmler", list.filter(function (it) { return it.type === "movie"; }).sort(byVote)),
+      row("Birden fazla platformda", list.filter(function (it) { return it.plats.length > 1; }).sort(byVote)),
+      row("Spor ve canlı yayın", list.filter(function (it) { return it.type === "live"; })),
+      row("Elle eklediklerim", list.filter(function (it) { return userItems.some(function (u) { return u.k === it.k; }); })),
+      row("İzlediklerim", rawList.filter(function (it) { return seen.indexOf(it.k) >= 0; }))
+    ];
+    var any = false;
+    rows.forEach(function (r) { if (r) { host.appendChild(r); any = true; } });
+    document.getElementById("empty").hidden = any;
+    document.getElementById("bar").hidden = false;
+  }
+
+  function renderHero(pickNew) {
+    var all = merged().filter(function (it) { return it.backdrop && it.vote >= 7.8 && (!hideSeen || notSeen(it)); });
+    var h = document.getElementById("hero");
+    if (!all.length) { h.hidden = true; return; }
+    if (pickNew || !hero) hero = all[Math.floor(Math.random() * all.length)];
+    var it = hero;
+    h.hidden = false; h.textContent = "";
+    h.style.backgroundImage = "url(" + IMG + "w780" + it.backdrop + ")";
+    h.appendChild(el("div", "eyebrow", "Bu akşam için"));
+    h.appendChild(el("h2", "", it.title));
+    var m = [it.type === "tv" ? "Dizi" : "Film"].concat(genresOf(it).slice(0, 2));
+    if (it.year) m.push(it.year);
+    if (it.vote) m.push("★ " + it.vote.toFixed(1));
+    m.push(it.plats.map(function (c) { return PNAME[c]; }).join(" · "));
+    h.appendChild(el("div", "meta", m.join(" · ")));
+    h.appendChild(el("div", "ov", it.ov || ""));
+    var b = el("div", "btns");
+    var d = el("button", "btn", "Ayrıntı"); d.type = "button";
+    d.addEventListener("click", function () { openDetail(it); });
+    var o = el("button", "btn alt", "Başka öner"); o.type = "button";
+    o.addEventListener("click", function () { renderHero(true); });
+    b.appendChild(d); b.appendChild(o); h.appendChild(b);
+  }
+
+  /* ---------- pencereler ---------- */
+  var sheet = document.getElementById("sheet"), panel = document.getElementById("panel"), lastFocus = null;
+  function openPanel(build) {
+    lastFocus = document.activeElement;
+    panel.textContent = "";
+    var c = el("button", "close", "×"); c.type = "button"; c.setAttribute("aria-label", "Kapat");
+    c.addEventListener("click", closePanel);
+    panel.appendChild(c);
+    build(panel);
+    sheet.classList.add("on");
+    c.focus();
+  }
+  function closePanel() { sheet.classList.remove("on"); if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} } }
+  sheet.addEventListener("click", function (e) { if (e.target === sheet) closePanel(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && sheet.classList.contains("on")) closePanel(); });
+
+  function openDetail(it) {
+    openPanel(function (p) {
+      var two = el("div", "two");
+      two.appendChild(poster(it));
+      var info = el("div");
+      info.appendChild(el("h2", "", it.title));
+      var m = [it.type === "tv" ? "Dizi" : it.type === "movie" ? "Film" : "Canlı"].concat(genresOf(it).slice(0, 3));
+      if (it.year) m.push(it.year);
+      if (it.vote) m.push("★ " + it.vote.toFixed(1));
+      info.appendChild(el("div", "meta", m.join(" · ")));
+      info.appendChild(el("div", "meta", "Platform: " + (it.plats.map(function (c) { return PNAME[c]; }).join(", ") || "belirtilmemiş")));
+      two.appendChild(info);
+      p.appendChild(two);
+      p.appendChild(el("p", "ov", it.ov || "Bu içerik için özet yok."));
+      var rt = el("p", "", "");
+      p.appendChild(rt);
+      p.appendChild(el("h3", "", "Türkiye'de abonelikle izlenebilen yerler"));
+      var logos = el("div", "logos");
+      logos.appendChild(el("span", "", "Yükleniyor..."));
+      p.appendChild(logos);
+      if (it.id && (it.type === "tv" || it.type === "movie")) {
+        tmdb("/" + it.type + "/" + it.id, { language: "tr-TR", append_to_response: "watch/providers" }).then(function (d) {
+          var mins = it.type === "movie" ? d.runtime : ((d.episode_run_time && d.episode_run_time[0]) || (d.last_episode_to_air && d.last_episode_to_air.runtime) || 0);
+          var parts = [];
+          if (mins) parts.push((it.type === "movie" ? "Süre: " : "Bölüm süresi: yaklaşık ") + mins + " dk");
+          if (it.type === "tv" && d.number_of_seasons) parts.push(d.number_of_seasons + " sezon");
+          rt.textContent = parts.join(" · ");
+          var t = ((d["watch/providers"] || {}).results || {}).TR;
+          var flat = t && t.flatrate ? t.flatrate : [];
+          logos.textContent = "";
+          if (!flat.length) { logos.appendChild(el("span", "", "Türkiye'de abonelik platformu bilgisi bulunamadı. Kaynak: JustWatch.")); return; }
+          flat.forEach(function (x) {
+            var w = el("div", "logo");
+            if (x.logo_path) { var im = el("img"); im.src = IMG + "w92" + x.logo_path; im.alt = x.provider_name; im.title = x.provider_name; w.appendChild(im); }
+            w.appendChild(el("span", "", x.provider_name));
+            logos.appendChild(w);
+          });
+          logos.appendChild(el("span", "", "Kaynak: JustWatch"));
+        }).catch(function () { logos.textContent = ""; logos.appendChild(el("span", "", "Platform bilgisi alınamadı.")); });
+      } else { logos.textContent = ""; }
+      var acts = el("div", "acts");
+      var f = el("button", "btn gold", favs.indexOf(it.k) >= 0 ? "Listemden çıkar" : "Listeme ekle"); f.type = "button";
+      f.addEventListener("click", function () {
+        var i = favs.indexOf(it.k); if (i >= 0) favs.splice(i, 1); else favs.push(it.k);
+        wr(K_FAV, favs); closePanel(); render();
+      });
+      acts.appendChild(f);
+      var sn = el("button", "btn alt", seen.indexOf(it.k) >= 0 ? "İzlenenlerden çıkar" : "İzledim"); sn.type = "button";
+      sn.addEventListener("click", function () {
+        var i = seen.indexOf(it.k); if (i >= 0) seen.splice(i, 1); else seen.push(it.k);
+        wr(K_SEEN, seen); closePanel(); render(); renderHero(false);
+      });
+      acts.appendChild(sn);
+      if (userItems.some(function (u) { return u.k === it.k; })) {
+        var d = el("button", "btn alt", "Elle eklemeyi sil"); d.type = "button";
+        d.addEventListener("click", function () {
+          userItems = userItems.filter(function (u) { return u.k !== it.k; });
+          wr(K_USER, userItems); closePanel(); render(); renderHero(true);
+        });
+        acts.appendChild(d);
+      }
+      p.appendChild(acts);
+    });
+  }
+
+  function openAdd() {
+    openPanel(function (p) {
+      p.appendChild(el("h2", "", "İçerik ekle"));
+      p.appendChild(el("p", "", "Katalogda olmayan bir içeriği (özellikle beIN CONNECT) ara, platformu seç ve ekle."));
+      var lp = el("label", "", "Platform");
+      var sel = el("select"); sel.id = "addPlat";
+      ["B", "N", "P", "T"].forEach(function (c) { var o = el("option", "", PNAME[c]); o.value = c; sel.appendChild(o); });
+      lp.appendChild(sel); p.appendChild(lp);
+      var lq = el("label", "", "Ad ile ara");
+      var q = el("input"); q.id = "addQ"; q.type = "search"; q.placeholder = "Örn. Game of Thrones";
+      lq.appendChild(q); p.appendChild(lq);
+      var go = el("button", "btn gold", "Ara"); go.type = "button";
+      p.appendChild(go);
+      var res = el("div", "results"); res.setAttribute("aria-live", "polite"); p.appendChild(res);
+      async function search() {
+        var term = q.value.trim(); if (!term) return;
+        res.textContent = "Aranıyor...";
+        try {
+          var d = await tmdb("/search/multi", { query: term, language: "tr-TR", include_adult: "false" });
+          var list = (d.results || []).filter(function (r) { return r.media_type === "tv" || r.media_type === "movie"; }).slice(0, 8);
+          res.textContent = "";
+          if (!list.length) { res.textContent = "Sonuç bulunamadı."; return; }
+          list.forEach(function (r) {
+            var it = fromRaw(r.media_type, r);
+            var b = el("button", "res"); b.type = "button";
+            b.appendChild(poster(Object.assign({}, it, { plats: [] })));
+            var t = el("div"); t.appendChild(document.createTextNode(it.title));
+            t.appendChild(el("small", "", (it.type === "tv" ? "Dizi" : "Film") + (it.year ? " · " + it.year : "")));
+            b.appendChild(t);
+            b.addEventListener("click", function () {
+              it.plats = [sel.value];
+              var ex = userItems.filter(function (u) { return u.k === it.k; })[0];
+              if (ex) { if (ex.plats.indexOf(sel.value) < 0) ex.plats.push(sel.value); }
+              else userItems.push(it);
+              wr(K_USER, userItems); closePanel(); render(); renderHero(false);
+            });
+            res.appendChild(b);
+          });
+        } catch (e) { res.textContent = "Arama yapılamadı. Bağlantını ve API anahtarını kontrol et."; }
+      }
+      go.addEventListener("click", search);
+      q.addEventListener("keydown", function (e) { if (e.key === "Enter") search(); });
+
+      p.appendChild(el("h3", "", "Maç veya canlı yayın kartı"));
+      var lt = el("label", "", "Başlık"); var ti = el("input"); ti.placeholder = "Örn. Galatasaray - Fenerbahçe"; lt.appendChild(ti); p.appendChild(lt);
+      var add2 = el("button", "btn alt", "Kart ekle"); add2.type = "button";
+      add2.addEventListener("click", function () {
+        var t = ti.value.trim(); if (!t) return;
+        userItems.push({ k: "live" + Date.now(), type: "live", id: 0, title: t, year: null, vote: 0, gids: [], glabels: ["Spor"], poster: "", backdrop: "", ov: "Elle eklenen canlı yayın kartı.", plats: [sel.value] });
+        wr(K_USER, userItems); closePanel(); render();
+      });
+      p.appendChild(add2);
+    });
+  }
+
+  function openSettings() {
+    openPanel(function (p) {
+      p.appendChild(el("h2", "", "Ayarlar"));
+      var l = el("label", "", "TMDB API anahtarı");
+      var i = el("input"); i.type = "password"; i.value = key; i.autocomplete = "off"; i.placeholder = "32 karakterlik anahtar";
+      l.appendChild(i); p.appendChild(l);
+      p.appendChild(el("p", "", "Anahtar yalnızca bu cihazda saklanır."));
+      var acts = el("div", "acts");
+      var s = el("button", "btn gold", "Kaydet"); s.type = "button";
+      s.addEventListener("click", function () { saveKey(i.value.trim()); });
+      var r = el("button", "btn alt", "Kataloğu yenile"); r.type = "button";
+      r.addEventListener("click", function () { closePanel(); boot(true); });
+      var x = el("button", "btn alt", "Anahtarı sil"); x.type = "button";
+      x.addEventListener("click", function () { try { localStorage.removeItem(K_KEY); localStorage.removeItem(K_CAT); } catch (e) {} key = ""; closePanel(); showSetup(); });
+      acts.appendChild(s); acts.appendChild(r); acts.appendChild(x); p.appendChild(acts);
+      var a = el("p", "", "");
+      a.appendChild(document.createTextNode("Veriler "));
+      var l1 = el("a", "", "TMDB"); l1.href = "https://www.themoviedb.org"; l1.target = "_blank"; l1.rel = "noopener";
+      a.appendChild(l1); a.appendChild(document.createTextNode("'den, platform bilgisi JustWatch'tan alınır."));
+      p.appendChild(a);
+    });
+  }
+
+  async function saveKey(raw) {
+    var m = String(raw || "").match(/[0-9a-f]{32}/i);
+    if (!m) { setStatus("Anahtar bulunamadı. 32 karakterlik API Anahtarı'nı (uzun jeton değil) yapıştır.", true); return; }
+    var v = m[0];
+    key = v;
+    setStatus("Anahtar kontrol ediliyor...");
+    try { await tmdb("/configuration", {}); } catch (e) {
+      key = "";
+      setStatus(e.status ? "TMDB anahtarı kabul etmedi (hata " + e.status + "). Anahtarı kontrol et." : "TMDB'ye ulaşılamadı. İnternet bağlantını kontrol et. Dosyayı doğrudan telefondan açıyorsan, GitHub Pages adresinden aç.", true);
+      return;
+    }
+    try { localStorage.setItem(K_KEY, key); } catch (e) {}
+    closePanel(); boot(true);
+  }
+
+  function showSetup() {
+    var h = document.getElementById("setupHost");
+    h.textContent = "";
+    document.getElementById("hero").hidden = true;
+    document.getElementById("bar").hidden = true;
+    document.getElementById("rows").textContent = "";
+    var box = el("div", "setup");
+    box.appendChild(el("h2", "", "Başlamak için API anahtarı"));
+    box.appendChild(el("p", "", "themoviedb.org hesabındaki Ayarlar > API sayfasından 32 karakterlik API Anahtarı'nı kopyala ve buraya yapıştır. Anahtar yalnızca bu cihazda saklanır."));
+    var i = el("input"); i.type = "password"; i.placeholder = "API anahtarı"; i.autocomplete = "off"; i.setAttribute("aria-label", "TMDB API anahtarı");
+    var b = el("button", "btn gold", "Kaydet ve başla"); b.type = "button";
+    b.addEventListener("click", function () { saveKey(i.value.trim()); });
+    box.appendChild(i); box.appendChild(b); h.appendChild(box);
+  }
+
+  async function boot(force) {
+    document.getElementById("setupHost").textContent = "";
+    if (!key) { showSetup(); return; }
+    try {
+      items = await loadCatalog(!!force);
+      setStatus("");
+      hero = null; render(); renderHero(true);
+    } catch (e) {
+      setStatus(e.status === 401 ? "API anahtarı geçersiz. Ayarlar'dan düzelt." : "Katalog yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.", true);
+      var cache = rd(K_CAT, null);
+      if (cache && cache.items) { genreNames = cache.genres || {}; items = cache.items; render(); renderHero(true); }
+    }
+  }
+
+  document.getElementById("addBtn").addEventListener("click", function () { if (key) openAdd(); else showSetup(); });
+  document.getElementById("setBtn").addEventListener("click", openSettings);
+  boot(false);
+})();
+</script>
+</body>
+</html>
