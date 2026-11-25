@@ -146,8 +146,8 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   var API = "https://api.themoviedb.org/3";
   var IMG = "https://image.tmdb.org/t/p/";
   var PROXY = "https://wsrv.nl/?url="; /* image.tmdb.org erisilemezse yedek yol */
-  var PROV = { 8: "N", 119: "P", 1904: "T" };
-  var PNAME = { N: "Netflix", P: "Prime Video", T: "TV+", B: "beIN CONNECT" };
+  var PROV = { 8: "N", 119: "P", 1904: "T", 1826: "B" }; /* 1826 = TOD (beIN CONNECT uyeligiyle acilir) */
+  var PNAME = { N: "Netflix", P: "Prime Video", T: "TV+", B: "beIN CONNECT / TOD" };
   var PAGES = 3, TTL = 12 * 3600 * 1000;
   var K_KEY = "nz.key", K_CAT = "nz.catalog", K_USER = "nz.user", K_FAV = "nz.fav", K_SEEN = "nz.seen", K_HIDE = "nz.hide";
 
@@ -186,7 +186,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
 
   async function loadCatalog(force) {
     var cache = rd(K_CAT, null);
-    if (!force && cache && Date.now() - cache.ts < TTL && cache.items && cache.items.length) {
+    if (!force && cache && cache.v === 2 && Date.now() - cache.ts < TTL && cache.items && cache.items.length) {
       genreNames = cache.genres || {}; return cache.items;
     }
     setStatus("Katalog yükleniyor...");
@@ -215,7 +215,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
       });
     });
     var list = Object.keys(map).map(function (k) { return map[k]; });
-    wr(K_CAT, { ts: Date.now(), items: list, genres: names });
+    wr(K_CAT, { v: 2, ts: Date.now(), items: list, genres: names });
     return list;
   }
 
@@ -447,7 +447,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   function openAdd() {
     openPanel(function (p) {
       p.appendChild(el("h2", "", "İçerik ekle"));
-      p.appendChild(el("p", "", "Katalogda olmayan bir içeriği (özellikle beIN CONNECT) ara, platformu seç ve ekle."));
+      p.appendChild(el("p", "", "Katalogda olmayan bir içeriği (TOD dışındaki beIN içerikleri, maçlar vb.) ara, platformu seç ve ekle."));
       var lp = el("label", "", "Platform");
       var sel = el("select"); sel.id = "addPlat";
       ["B", "N", "P", "T"].forEach(function (c) { var o = el("option", "", PNAME[c]); o.value = c; sel.appendChild(o); });
