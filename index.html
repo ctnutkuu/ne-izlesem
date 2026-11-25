@@ -109,6 +109,17 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
 .empty { color: var(--muted); padding: 24px 16px; }
 .foot { margin: 26px 16px 0; font-size: 12px; color: var(--muted); }
 .foot p { margin: 4px 0; }
+.cap.long { -webkit-line-clamp: 5; }
+.cap .why { color: var(--accent); font-size: 11px; margin-top: 2px; }
+.hint { margin: 16px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.hint h2 { font-family: var(--font-display); font-weight: 500; font-size: 18px; margin: 0 0 4px; }
+.hint p { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.tr { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.tr .poster { flex: 0 0 44px; aspect-ratio: 2/3; border-radius: 4px; padding: 0; }
+.tr .tt { flex: 1 1 120px; min-width: 0; font-size: 14px; }
+.tr .tt small { color: var(--muted); display: block; }
+.rbar { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; }
+.chip.sm { font-size: 12px; padding: 6px 10px; }
 @media (min-width: 700px) { .card { flex-basis: 150px; } }
 @media (prefers-reduced-motion: no-preference) { .card .poster { transition: transform .15s; } .card:hover .poster { transform: translateY(-3px); } }
 </style>
@@ -117,6 +128,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
 <div class="top">
   <h1>Ne İzlesem</h1>
   <div style="display:flex;gap:8px">
+    <button class="iconbtn" id="tasteBtn" type="button" aria-label="Zevkim" title="Zevkim">♥</button>
     <button class="iconbtn" id="addBtn" type="button" aria-label="İçerik ekle" title="İçerik ekle">+</button>
     <button class="iconbtn" id="setBtn" type="button" aria-label="Ayarlar" title="Ayarlar">⚙</button>
   </div>
@@ -149,6 +161,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   var PROV = { 8: "N", 119: "P", 1904: "T", 1826: "B" }; /* 1826 = TOD (beIN CONNECT uyeligiyle acilir) */
   var PNAME = { N: "Netflix", P: "Prime Video", T: "TV+", B: "beIN CONNECT / TOD" };
   var PAGES = 3, TTL = 12 * 3600 * 1000;
+  var K_TASTE = "nz.taste", K_RECS = "nz.recs";
   var K_KEY = "nz.key", K_CAT = "nz.catalog", K_USER = "nz.user", K_FAV = "nz.fav", K_SEEN = "nz.seen", K_HIDE = "nz.hide";
 
   function rd(k, d) { try { var r = localStorage.getItem(k); return r ? JSON.parse(r) : d; } catch (e) { return d; } }
@@ -159,6 +172,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   var genreNames = {};
   var items = [], userItems = rd(K_USER, []), favs = rd(K_FAV, []), seen = rd(K_SEEN, []), hideSeen = rd(K_HIDE, true);
   function notSeen(it) { return seen.indexOf(it.k) < 0; }
+  var taste = rd(K_TASTE, {}), forYou = [], fyTok = 0, fyTimer = null;
   var fPlat = "Hepsi", fGenre = "Hepsi", hero = null;
   var statusEl = document.getElementById("status");
 
@@ -236,6 +250,100 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     return out;
   }
 
+  /* ---------- zevk ve öneri ---------- */
+  function setRating(it, r) {
+    if (!it.id || (it.type !== "tv" && it.type !== "movie")) return;
+    if (taste[it.k] && taste[it.k].r === r) { delete taste[it.k]; }
+    else {
+      taste[it.k] = { k: it.k, type: it.type, id: it.id, title: it.title, year: it.year, poster: it.poster || "", gids: it.gids || [], r: r, t: Date.now() };
+      if (seen.indexOf(it.k) < 0) { seen.push(it.k); wr(K_SEEN, seen); }
+    }
+    wr(K_TASTE, taste);
+    scheduleFY();
+  }
+
+  function ratingBar(it, after) {
+    var w = el("div", "rbar"), bs = [];
+    function sync() { bs.forEach(function (x) { x.b.setAttribute("aria-pressed", String(!!taste[it.k] && taste[it.k].r === x.r)); }); }
+    [[2, "👍 Bayıldım"], [1, "🙂 İyiydi"], [-1, "👎 Sevmedim"]].forEach(function (o) {
+      var b = el("button", "chip sm", o[1]); b.type = "button";
+      b.addEventListener("click", function () { setRating(it, o[0]); sync(); if (after) after(); });
+      bs.push({ b: b, r: o[0] }); w.appendChild(b);
+    });
+    sync();
+    return w;
+  }
+
+  async function fetchRecs(seed) {
+    var cache = rd(K_RECS, {}), c = cache[seed.k];
+    if (c && Date.now() - c.ts < 7 * 24 * 3600 * 1000) return c.keys;
+    try {
+      var d = await tmdb("/" + seed.type + "/" + seed.id + "/recommendations", { language: "tr-TR", page: 1 });
+      var keys = (d.results || []).map(function (r) { return ((r.media_type === "tv" || r.media_type === "movie") ? r.media_type : seed.type) + r.id; });
+      cache = rd(K_RECS, {}); cache[seed.k] = { ts: Date.now(), keys: keys }; wr(K_RECS, cache);
+      return keys;
+    } catch (e) { return []; }
+  }
+
+  async function refreshForYou() {
+    var tok = ++fyTok;
+    var seeds = Object.keys(taste).map(function (k) { return taste[k]; });
+    if (!seeds.length) { forYou = []; return; }
+    setStatus("Öneriler hesaplanıyor...");
+    try {
+      seeds.sort(function (a, b) { return (b.r - a.r) || ((b.t || 0) - (a.t || 0)); });
+      var pos = seeds.filter(function (x) { return x.r > 0; }).slice(0, 20);
+      var neg = seeds.filter(function (x) { return x.r < 0; }).slice(0, 8);
+      var used = pos.concat(neg);
+      var lists = await Promise.all(used.map(fetchRecs));
+      if (tok !== fyTok) return;
+      var gw = {}, gmax = 1;
+      seeds.forEach(function (x) {
+        var w = x.r === 2 ? 2 : x.r === 1 ? 1 : -2;
+        (x.gids || []).forEach(function (g) { gw[g] = (gw[g] || 0) + w; });
+      });
+      Object.keys(gw).forEach(function (g) { if (Math.abs(gw[g]) > gmax) gmax = Math.abs(gw[g]); });
+      var rs = {};
+      used.forEach(function (x, idx) {
+        var w = x.r === 2 ? 2 : x.r === 1 ? 1 : -2;
+        lists[idx].forEach(function (k, i) {
+          var c = w * Math.max(0.25, 1 - i / 25);
+          var o = rs[k] || (rs[k] = { sc: 0, best: 0, seed: "" });
+          o.sc += c;
+          if (c > o.best) { o.best = c; o.seed = x.title; }
+        });
+      });
+      var out = [];
+      merged().forEach(function (it) {
+        if ((it.type !== "tv" && it.type !== "movie") || !it.plats.length) return;
+        if (taste[it.k] || seen.indexOf(it.k) >= 0) return;
+        var gs = 0, topG = null, topV = 0;
+        (it.gids || []).forEach(function (g) { var v = gw[g] || 0; gs += v; if (v > topV) { topV = v; topG = g; } });
+        gs = Math.max(-1, Math.min(1, gs / (gmax * 3)));
+        var r = rs[it.k];
+        if (!((r && r.sc > 0) || gs > 0.2)) return;
+        var score = (r ? r.sc : 0) + gs * 1.5 + (it.vote || 0) * 0.05;
+        if (score <= 0.5) return;
+        var why = "";
+        if (r && r.best > 0.3 && r.sc > 0) why = "«" + r.seed + "» sevdiğin için";
+        else if (topG && genreNames[topG]) why = "Sevdiğin tür: " + genreNames[topG];
+        it.why = why; it.score = score; out.push(it);
+      });
+      out.sort(function (a, b) { return b.score - a.score; });
+      forYou = out.slice(0, 40);
+    } finally { if (tok === fyTok) setStatus(""); }
+  }
+
+  function scheduleFY() {
+    clearTimeout(fyTimer);
+    fyTimer = setTimeout(function () { refreshForYou().then(function () { render(); renderHero(true); }).catch(function () { setStatus(""); }); }, 700);
+  }
+
+  function kickFY() {
+    if (!Object.keys(taste).length) return;
+    refreshForYou().then(function () { render(); renderHero(true); }).catch(function () { setStatus(""); });
+  }
+
   /* ---------- görünüm ---------- */
   function hue(t) { var s = 0; for (var i = 0; i < t.length; i++) s = (s * 31 + t.charCodeAt(i)) % 360; return s; }
 
@@ -275,7 +383,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     });
   }
 
-  function row(title, list) {
+  function row(title, list, why) {
     if (!list.length) return null;
     var r = el("section", "row");
     var head = el("div", "rowhead");
@@ -291,14 +399,25 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
       var c = el("button", "card"); c.type = "button";
       c.setAttribute("aria-label", it.title);
       c.appendChild(poster(it));
-      var cap = el("div", "cap", it.title);
+      var cap = el("div", why ? "cap long" : "cap", it.title);
       if (it.year) cap.appendChild(el("small", "", it.year + (it.vote ? " · ★ " + it.vote.toFixed(1) : "")));
+      if (why && it.why) cap.appendChild(el("small", "why", it.why));
       c.appendChild(cap);
       c.addEventListener("click", function () { openDetail(it); });
       sc.appendChild(c);
     });
     r.appendChild(head); r.appendChild(sc);
     return r;
+  }
+
+  function hint() {
+    var h = el("section", "hint");
+    h.appendChild(el("h2", "", "Sana özel öneriler"));
+    h.appendChild(el("p", "", "Sevdiğin birkaç film ve diziyi işaretle, burada senin zevkine göre öneriler çıksın."));
+    var b = el("button", "btn gold", "Zevkimi ekle"); b.type = "button";
+    b.addEventListener("click", openTaste);
+    h.appendChild(b);
+    return h;
   }
 
   function byVote(a, b) { return (b.vote || 0) - (a.vote || 0); }
@@ -320,8 +439,11 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     var list = hideSeen ? rawList.filter(notSeen) : rawList;
     var host = document.getElementById("rows");
     host.textContent = "";
+    if (!Object.keys(taste).length) host.appendChild(hint());
     var thisYear = new Date().getFullYear();
+    var fy = filtered(forYou).filter(notSeen).slice(0, 24);
     var rows = [
+      row("Senin için", fy, true),
       row("Benim listem", rawList.filter(function (it) { return favs.indexOf(it.k) >= 0 && notSeen(it); })),
       row("Yüksek puanlılar", list.filter(function (it) { return it.vote >= 7.8; }).sort(byVote).slice(0, 30)),
       row("Yeni çıkanlar", list.filter(function (it) { return it.year >= thisYear - 1; }).sort(function (a, b) { return b.year - a.year || byVote(a, b); }).slice(0, 30)),
@@ -339,7 +461,9 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
   }
 
   function renderHero(pickNew) {
-    var all = merged().filter(function (it) { return it.backdrop && it.vote >= 7.8 && (!hideSeen || notSeen(it)); });
+    var pers = forYou.filter(function (it) { return it.backdrop && notSeen(it); }).slice(0, 10);
+    var mine = pers.length > 0;
+    var all = mine ? pers : merged().filter(function (it) { return it.backdrop && it.vote >= 7.8 && (!hideSeen || notSeen(it)); });
     var h = document.getElementById("hero");
     if (!all.length) { h.hidden = true; return; }
     if (pickNew || !hero) hero = all[Math.floor(Math.random() * all.length)];
@@ -347,7 +471,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     h.hidden = false; h.textContent = "";
     h.style.backgroundImage = "url(" + IMG + "w780" + it.backdrop + ")";
     var bt = new Image(); bt.onerror = function () { h.style.backgroundImage = "url(" + PROXY + encodeURIComponent("image.tmdb.org/t/p/w780" + it.backdrop) + ")"; }; bt.src = IMG + "w780" + it.backdrop;
-    h.appendChild(el("div", "eyebrow", "Bu akşam için"));
+    h.appendChild(el("div", "eyebrow", mine ? "Senin için" : "Bu akşam için"));
     h.appendChild(el("h2", "", it.title));
     var m = [it.type === "tv" ? "Dizi" : "Film"].concat(genresOf(it).slice(0, 2));
     if (it.year) m.push(it.year);
@@ -355,6 +479,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     m.push(it.plats.map(function (c) { return PNAME[c]; }).join(" · "));
     h.appendChild(el("div", "meta", m.join(" · ")));
     h.appendChild(el("div", "ov", it.ov || ""));
+    if (mine && it.why) h.appendChild(el("div", "meta", it.why));
     var b = el("div", "btns");
     var d = el("button", "btn", "Ayrıntı"); d.type = "button";
     d.addEventListener("click", function () { openDetail(it); });
@@ -419,6 +544,10 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
           logos.appendChild(el("span", "", "Kaynak: JustWatch"));
         }).catch(function () { logos.textContent = ""; logos.appendChild(el("span", "", "Platform bilgisi alınamadı.")); });
       } else { logos.textContent = ""; }
+      if (it.id && (it.type === "tv" || it.type === "movie")) {
+        p.appendChild(el("h3", "", "Nasıl buldun?"));
+        p.appendChild(ratingBar(it, function () { render(); }));
+      }
       var acts = el("div", "acts");
       var f = el("button", "btn gold", favs.indexOf(it.k) >= 0 ? "Listemden çıkar" : "Listeme ekle"); f.type = "button";
       f.addEventListener("click", function () {
@@ -441,6 +570,53 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
         acts.appendChild(d);
       }
       p.appendChild(acts);
+    });
+  }
+
+  function openTaste() {
+    if (!key) { showSetup(); return; }
+    openPanel(function (p) {
+      p.appendChild(el("h2", "", "Zevkim"));
+      p.appendChild(el("p", "", "Daha önce izleyip bayıldığın, beğendiğin ya da sevmediğin film ve dizileri işaretle. Ne kadar çok işaretlersen \"Senin için\" önerileri o kadar isabetli olur. İşaretlediğin içerik izlenmiş sayılır."));
+      var lq = el("label", "", "Film veya dizi ara");
+      var q = el("input"); q.type = "search"; q.placeholder = "Örn. Breaking Bad";
+      lq.appendChild(q); p.appendChild(lq);
+      var go = el("button", "btn gold", "Ara"); go.type = "button"; p.appendChild(go);
+      var res = el("div", "results"); res.setAttribute("aria-live", "polite"); p.appendChild(res);
+      var mine = el("div"); p.appendChild(mine);
+      function line(it) {
+        var w = el("div", "tr");
+        w.appendChild(poster(Object.assign({}, it, { plats: [] })));
+        var t = el("div", "tt"); t.appendChild(document.createTextNode(it.title));
+        t.appendChild(el("small", "", (it.type === "tv" ? "Dizi" : "Film") + (it.year ? " · " + it.year : "")));
+        w.appendChild(t);
+        w.appendChild(ratingBar(it, drawMine));
+        return w;
+      }
+      function drawMine() {
+        mine.textContent = "";
+        var list = Object.keys(taste).map(function (k) { return taste[k]; });
+        if (!list.length) return;
+        list.sort(function (a, b) { return (b.r - a.r) || ((b.t || 0) - (a.t || 0)); });
+        mine.appendChild(el("h3", "", "Değerlendirdiklerim (" + list.length + ")"));
+        var box = el("div", "results");
+        list.forEach(function (e) { box.appendChild(line(e)); });
+        mine.appendChild(box);
+      }
+      async function search() {
+        var term = q.value.trim(); if (!term) return;
+        res.textContent = "Aranıyor...";
+        try {
+          var d = await tmdb("/search/multi", { query: term, language: "tr-TR", include_adult: "false" });
+          var list = (d.results || []).filter(function (r) { return r.media_type === "tv" || r.media_type === "movie"; }).slice(0, 8);
+          res.textContent = "";
+          if (!list.length) { res.textContent = "Sonuç bulunamadı."; return; }
+          list.forEach(function (r) { res.appendChild(line(fromRaw(r.media_type, r))); });
+        } catch (e) { res.textContent = "Arama yapılamadı. Bağlantını ve API anahtarını kontrol et."; }
+      }
+      go.addEventListener("click", search);
+      q.addEventListener("keydown", function (e) { if (e.key === "Enter") search(); });
+      drawMine();
     });
   }
 
@@ -558,14 +734,15 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter
     try {
       items = await loadCatalog(!!force);
       setStatus("");
-      hero = null; render(); renderHero(true);
+      hero = null; render(); renderHero(true); kickFY();
     } catch (e) {
       setStatus(e.status === 401 ? "API anahtarı geçersiz. Ayarlar'dan düzelt." : "Katalog yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.", true);
       var cache = rd(K_CAT, null);
-      if (cache && cache.items) { genreNames = cache.genres || {}; items = cache.items; render(); renderHero(true); }
+      if (cache && cache.items) { genreNames = cache.genres || {}; items = cache.items; render(); renderHero(true); kickFY(); }
     }
   }
 
+  document.getElementById("tasteBtn").addEventListener("click", openTaste);
   document.getElementById("addBtn").addEventListener("click", function () { if (key) openAdd(); else showSetup(); });
   document.getElementById("setBtn").addEventListener("click", openSettings);
   boot(false);
